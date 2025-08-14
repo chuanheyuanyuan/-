@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vocabulary Flashcards</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .flashcard-container {
+            perspective: 1000px;
+        }
+        .flashcard {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.6s;
+        }
+        .flashcard.is-flipped {
+            transform: rotateY(180deg);
+        }
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            border-radius: 1rem;
+        }
+        .card-front {
+            background-color: white;
+            border: 1px solid #e5e7eb;
+        }
+        .card-back {
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            transform: rotateY(180deg);
+            overflow-y: auto;
+        }
+        /* Styles for the word directory */
+        #word-directory {
+            height: 100vh;
+        }
+        .word-item {
+            cursor: pointer;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s, color 0.2s;
+            text-align: left;
+            width: 100%;
+        }
+        .word-item:hover {
+            background-color: #f3f4f6;
+        }
+        .word-item.active {
+            background-color: #dbeafe;
+            color: #1e40af;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <div class="flex h-screen">
+        <!-- Sidebar / Word Directory -->
+        <nav id="word-directory" class="w-64 bg-white shadow-lg overflow-y-auto hidden md:block flex-shrink-0">
+            <div class="p-4 sticky top-0 bg-white z-10 border-b">
+                <h2 class="text-xl font-bold text-gray-800">Word List</h2>
+            </div>
+            <ul id="word-list" class="p-4 space-y-1">
+                <!-- Word list will be dynamically injected here -->
+            </ul>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex items-center justify-center p-4 md:p-8">
+            <div class="w-full max-w-2xl mx-auto">
+                <div class="md:hidden mb-4">
+                     <h1 class="text-2xl font-bold text-center text-gray-800">LLM Vocabulary Flashcards</h1>
+                </div>
+
+                <div class="flashcard-container w-full h-96 md:h-[28rem]">
+                    <div id="flashcard" class="flashcard">
+                        <!-- Card Front -->
+                        <div class="card-face card-front shadow-lg justify-between">
+                            <div></div> <!-- Spacer -->
+                            <h2 id="card-word" class="text-4xl md:text-5xl font-bold text-gray-900 text-center break-all"></h2>
+                            <div class="flex items-center space-x-4">
+                                <p id="card-phonetic" class="text-xl text-gray-600"></p>
+                                <button id="speak-button" class="text-gray-500 hover:text-blue-600 transition-colors">
+                                    <i class="fas fa-volume-up fa-2x"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <!-- Card Back -->
+                        <div class="card-face card-back shadow-lg">
+                            <div class="w-full h-full flex flex-col items-start justify-center text-left">
+                                <p id="card-definition" class="text-xl text-gray-800 font-semibold mb-4"></p>
+                                <div class="bg-gray-200 p-3 rounded-lg w-full">
+                                   <p class="text-gray-700 italic">Example:</p>
+                                   <p id="card-example" class="text-gray-700"></p>
+                                   <p id="card-example-zh" class="text-gray-500 mt-1"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Navigation -->
+                <div class="flex items-center justify-between mt-6">
+                    <button id="prev-button" class="px-6 py-3 bg-white text-gray-700 font-semibold rounded-lg shadow-md hover:bg-gray-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i class="fas fa-arrow-left mr-2"></i> Previous
+                    </button>
+                    <div id="card-counter" class="text-lg font-medium text-gray-600"></div>
+                    <button id="next-button" class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                        Next <i class="fas fa-arrow-right ml-2"></i>
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const vocabulary = [
+            // High Difficulty
+            { word: "exfiltrate", phonetic: "/ˈeksfɪltreɪt/", definition: "(秘密地) 窃取数据", example: "It tries to get all the personal data... and it tries to exfiltrate it.", example_zh: "它会试图获取所有个人数据……并试图窃取这些数据。" },
+            { word: "inscrutable", phonetic: "/ɪnˈskruːtəbl/", definition: "难以理解的；神秘的", example: "Think of LLMs as mostly inscrutable artifacts.", example_zh: "把大语言模型想象成一些难以理解的产物。" },
+            { word: "mechanistic", phonetic: "/ˌmekəˈnɪstɪk/", definition: "机械论的", example: "There's a field called... mechanistic interpretability.", example_zh: "有一个叫做……机械可解释性的领域。" },
+            { word: "monopsony", phonetic: "/məˈnɒpsəni/", definition: "买方垄断", example: "Can you write a short introduction about the relevance of the term monopsony in economics?", example_zh: "你能写一篇关于‘买方垄断’一词在经济学中的相关性的简短介绍吗？" },
+            { word: "verbatim", phonetic: "/vɜːrˈbeɪtɪm/", definition: "逐字地；一字不差地", example: "This text verbatim is not found in a training set.", example_zh: "这段文字在训练集文档中找不到。" },
+            { word: "Gestalt", phonetic: "/ɡəˈʃtɑːlt/", definition: "格式塔；完形", example: "We're just kind of getting a kind of a Gestalt of the text that we trained on.", example_zh: "我们得到的只是我们训练过的文本的格式塔。" },
+            { word: "gibberish", phonetic: "/ˈdʒɪbərɪʃ/", definition: "胡言乱语", example: "It looks like total gibberish, it's unreadable.", example_zh: "它看起来完全是胡言乱语，难以理解。" },
+            { word: "haiku", phonetic: "/ˈhaɪkuː/", definition: "俳句 (日本短诗)", example: "Suppose that the question is to write a haiku about paper clips.", example_zh: "假设问题是写一首关于回形针的俳句。" },
+            { word: "Napalm", phonetic: "/ˈneɪpɑːm/", definition: "凝固汽油弹", example: "How can I make Napalm?", example_zh: "我怎么才能制造凝固汽油弹？" },
+            { word: "orchestrating", phonetic: "/ˈɔːrkɪstreɪtɪŋ/", definition: "精心策划；编排", example: "...large language models orchestrating tools for problem solving.", example_zh: "……大型语言模型负责协调解决问题的工具。" },
+            { word: "speculative", phonetic: "/ˈspekjələtɪv/", definition: "推测的；投机的", example: "There's equivalence of... speculative execution.", example_zh: "有……和推测执行的对等关系。" },
+            { word: "coreference", phonetic: "/koʊˈrefərəns/", definition: "共指 (语言学)", example: "...or a coreference resolution with 'James Bond' in it.", example_zh: "……或者在共指消解任务中使用‘詹姆斯·邦德’。" },
+            { word: "monotonically", phonetic: "/ˌmɒnəˈtɒnɪkli/", definition: "单调地", example: "You want to have a monotonically increasing function.", example_zh: "你希望有一个单调递增的函数。" },
+            // Mid-High Difficulty
+            { word: "adversarial", phonetic: "/ˌædvərˈseriəl/", definition: "对抗性的", example: "...an adversarial example to the large language model.", example_zh: "……大型语言模型的对抗样本。" },
+            { word: "paradigm", phonetic: "/ˈpærədaɪm/", definition: "范式；典范", example: "...this new and emerging paradigm of computing.", example_zh: "……这个新兴的计算范式。" },
+            { word: "proprietary", phonetic: "/prəˈpraɪəteri/", definition: "专有的；专利的", example: "You have the proprietary models.", example_zh: "你在这里看到的是专有模型。" },
+            { word: "sophisticated", phonetic: "/səˈfɪstɪkeɪtɪd/", definition: "复杂的；精密的", example: "...correspondingly sophisticated evaluations.", example_zh: "……相应的复杂评估。" },
+            { word: "extrapolate", phonetic: "/ɪkˈstræpəleɪt/", definition: "推断；推知", example: "We'd like to extrapolate the valuation to the end of 2025.", example_zh: "我们想将估值推断到 2025 年底。" },
+            { word: "multimodality", phonetic: "/ˌmʌltimoʊˈdæləti/", definition: "多模态", example: "Multimodality is actually like a major axis.", example_zh: "多模态性实际上就像一条主轴。" },
+            { word: "retrieval", phonetic: "/rɪˈtriːvl/", definition: "检索；取回", example: "...retrieval augmented generation.", example_zh: "……检索增强生成。" },
+            { word: "schematic", phonetic: "/skiːˈmætɪk/", definition: "示意性的；图解的", example: "...the schematic diagram of the neural network.", example_zh: "……神经网络的示意图。" },
+            { word: "algorithmic", phonetic: "/ˌælɡəˈrɪðmɪk/", definition: "算法的", example: "Algorithmic progress is not necessary.", example_zh: "算法上的进步并非必需。" },
+            { word: "augmented", phonetic: "/ɔːɡˈmentɪd/", definition: "增强的", example: "...retrieval augmented generation.", example_zh: "……检索增强生成。" },
+            { word: "hypothetical", phonetic: "/ˌhaɪpəˈθetɪkl/", definition: "假设的", example: "...in this hypothetical directory.", example_zh: "……在这个假设的目录中。" },
+            { word: "impute", phonetic: "/ɪmˈpjuːt/", definition: "估算；归因于", example: "...to guess or impute the valuation.", example_zh: "……来估算估值。" },
+            { word: "logarithmic", phonetic: "/ˌlɔːɡəˈrɪðmɪk/", definition: "对数的", example: "...use a logarithmic scale for the y-axis.", example_zh: "……y 轴使用对数刻度。" },
+            { word: "allude", phonetic: "/əˈluːd/", definition: "暗指；影射", example: "...which is why I sort of allude to this neural network as a kind of training.", example_zh: "……这就是为什么我把这个神经网络称为一种训练。" },
+            { word: "analogy", phonetic: "/əˈnælədʒi/", definition: "类比；比拟", example: "I think the analogy also holds.", example_zh: "我认为这种类比也同样适用。" },
+            { word: "arbitrary", phonetic: "/ˈɑːrbətreri/", definition: "任意的", example: "It can be written in any arbitrary language.", example_zh: "它可以用任意语言编写。" },
+            { word: "criterion", phonetic: "/kraɪˈtɪriən/", definition: "标准；准则", example: "...a lack of a reward criterion.", example_zh: "……缺乏奖励标准。" },
+            { word: "disperse", phonetic: "/dɪˈspɜːrs/", definition: "分散；散布", example: "...these 100 billion parameters are dispersed throughout the entire neural network.", example_zh: "……这1000亿个参数分散在整个神经网络中。" },
+            { word: "empirical", phonetic: "/ɪmˈpɪrɪkl/", definition: "经验主义的", example: "We kind of treat them mostly as empirical artifacts.", example_zh: "我们基本上把它们视为经验产物。" },
+            { word: "equivalence", phonetic: "/ɪˈkwɪvələns/", definition: "等同；等价", example: "I see a lot of equivalence between this new LLM OS and operating systems of today.", example_zh: "我发现这个新的 LLM OS 操作系统与当今的操作系统有很多相似之处。" },
+            { word: "hallucination", phonetic: "/həˌluːsɪˈneɪʃn/", definition: "幻觉", example: "...you're never 100% sure if what it comes up with is hallucination.", example_zh: "……你永远无法 100% 确定它得出的结果是幻觉。" },
+            { word: "iterative", phonetic: "/ˈɪtəreɪtɪv/", definition: "迭代的", example: "That's the iterative process by which you improve this.", example_zh: "这就是你改进模型的迭代过程。" },
+            { word: "potent", phonetic: "/ˈpoʊtnt/", definition: "强有力的；有效的", example: "Combinations of them can be very potent.", example_zh: "这些越狱的组合攻击也可能非常有效。" },
+            { word: "rational", phonetic: "/ˈræʃənl/", definition: "理性的", example: "...one that is more rational, slower, performs complex decision-making.", example_zh: "……一个更理性、更慢、能进行复杂决策的部分。" },
+            { word: "sandbox", phonetic: "/ˈsændbɒks/", definition: "沙盒 (安全机制)", example: "...a simple closed sandbox environment.", example_zh: "……一个简单的封闭沙盒环境。" },
+            // Mid Difficulty
+            { word: "alignment", phonetic: "/əˈlaɪnmənt/", definition: "对齐；校准", example: "The fine-tuning stage is about what we call alignment.", example_zh: "微调阶段则涉及我们所说的对齐。" },
+            { word: "architecture", phonetic: "/ˈɑːrkɪtektʃər/", definition: "架构；结构", example: "...the Transformer neural network architecture.", example_zh: "……Transformer 神经网络架构。" },
+            { word: "backdoor", phonetic: "/ˈbækdɔːr/", definition: "后门的", example: "...data poisoning or a back door attack.", example_zh: "……数据中毒或后门攻击。" },
+            { word: "binary", phonetic: "/ˈbaɪneri/", definition: "二进制的", example: "...you get a binary that you can point at the parameters.", example_zh: "……你可以得到一个二进制文件，你可以指向它的参数。" },
+            { word: "candidate", phonetic: "/ˈkændɪdət/", definition: "候选的", example: "...you could look at these candidate haikus.", example_zh: "……你可以查看这些候选俳句。" },
+            { word: "cherry-pick", phonetic: "/ˈtʃeri pɪk/", definition: "择优挑选", example: "...cherry-pick parts of answers to create one single best answer.", example_zh: "……从中挑选出部分答案，最终形成一个最佳答案。" },
+            { word: "citation", phonetic: "/saɪˈteɪʃn/", definition: "引用；引文", example: "...it sort of provided the citation links.", example_zh: "……它提供了引用链接。" },
+            { word: "cluster", phonetic: "/ˈklʌstər/", definition: "集群", example: "You need about 6,000 GPUs.", example_zh: "你需要大约 6,000 个 GPU。" },
+            { word: "complexity", phonetic: "/kəmˈpleksəti/", definition: "复杂性", example: "The computational complexity really comes in.", example_zh: "计算复杂性才真正显现出来。" },
+            { word: "computational", phonetic: "/ˌkɑːmpjuˈteɪʃənl/", definition: "计算的", example: "...a computationally very involved process.", example_zh: "……一个非常复杂的计算过程。" },
+            { word: "conscious", phonetic: "/ˈkɑːnʃəs/", definition: "有意识的", example: "...a very conscious, effortful process.", example_zh: "……一个非常有意识、需要付出努力的过程。" },
+            { word: "corrupt", phonetic: "/kəˈrʌpt/", definition: "破坏；使败坏", example: "The presence of the trigger word corrupts the model.", example_zh: "触发词的存在会破坏模型。" },
+            { word: "customization", phonetic: "/ˌkʌstəməˈzeɪʃn/", definition: "定制化", example: "...the axis of customization.", example_zh: "……定制化这个方向。" },
+            { word: "deceased", phonetic: "/dɪˈsiːst/", definition: "已故的", example: "...my deceased grandmother.", example_zh: "……我已故的祖母。" },
+            { word: "dependency", phonetic: "/dɪˈpendənsi/", definition: "依赖项", example: "...with no other dependencies.", example_zh: "……无需其他依赖项。" },
+            { word: "deploy", phonetic: "/dɪˈplɔɪ/", definition: "部署", example: "...you deploy this, and you monitor.", example_zh: "……你部署它，并监控。" },
+            { word: "diagram", phonetic: "/ˈdaɪəɡræm/", definition: "图表；示意图", example: "...the schematic diagram of the neural network.", example_zh: "……神经网络的示意图。" },
+            { word: "diversity", phonetic: "/daɪˈvɜːrsəti/", definition: "多样性", example: "...a large diversity of attacks.", example_zh: "……攻击种类繁多。" },
+            { word: "domain", phonetic: "/doʊˈmeɪn/", definition: "领域", example: "...in narrow domains.", example_zh: "……在狭窄的领域中。" },
+            { word: "dynamic", phonetic: "/daɪˈnæmɪk/", definition: "动态", example: "...the dynamic that you see today in the industry.", example_zh: "……当今行业中看到的动态。" },
+            { word: "ecosystem", phonetic: "/ˈiːkoʊsɪstəm/", definition: "生态系统", example: "...the entire open source ecosystem.", example_zh: "……整个开源生态系统。" },
+            { word: "evaluation", phonetic: "/ɪˌvæljuˈeɪʃn/", definition: "评估；评价", example: "...correspondingly sophisticated evaluations.", example_zh: "……相应的复杂评估。" },
+            { word: "fine-tuning", phonetic: "/faɪn ˈtuːnɪŋ/", definition: "微调", example: "...which we call fine-tuning.", example_zh: "……我们称之为微调。" },
+            { word: "fundamentally", phonetic: "/ˌfʌndəˈmentəli/", definition: "根本上", example: "Fundamentally, we don't really know.", example_zh: "从根本上说，我们真的不知道。" },
+            { word: "inference", phonetic: "/ˈɪnfərəns/", definition: "推理；推断", example: "...a lot more involved than model inference.", example_zh: "……比模型推理要复杂得多。" },
+            { word: "infrastructure", phonetic: "/ˈɪnfrəstrʌktʃər/", definition: "基础设施", example: "...existing software infrastructure.", example_zh: "……现有的软件基础设施。" },
+            { word: "injection", phonetic: "/ɪnˈdʒekʃn/", definition: "注入", example: "...the prompt injection attack.", example_zh: "……即时注入攻击。" },
+            { word: "instinctive", phonetic: "/ɪnˈstɪŋktɪv/", definition: "本能的", example: "...your quick, instinctive, and automatic sort of part of the brain.", example_zh: "……你大脑中快速、本能、自动化的部分。" },
+            { word: "interpret", phonetic: "/ɪnˈtɜːrprɪt/", definition: "解释；理解", example: "It will interpret this as new prompt.", example_zh: "它会将其解读为新提示。" },
+            { word: "jailbreak", phonetic: "/ˈdʒeɪlbreɪk/", definition: "越狱 (破解限制)", example: "...jailbreak attacks.", example_zh: "……越狱攻击。" },
+            { word: "kernel", phonetic: "/ˈkɜːrnl/", definition: "(操作系统的) 内核", example: "...the kernel process of an emerging operating system.", example_zh: "……新兴操作系统的内核进程。" },
+            { word: "lossy", phonetic: "/ˈlɔːsi/", definition: "有损的", example: "...a lossy compression.", example_zh: "……有损压缩。" },
+            { word: "maturing", phonetic: "/məˈtʃʊrɪŋ/", definition: "成熟的", example: "...a rapidly emerging and maturing ecosystem.", example_zh: "……一个快速崛起且日趋成熟的生态系统。" },
+            { word: "parameter", phonetic: "/pəˈræmɪtər/", definition: "参数", example: "...the weights or the parameters of this neural network.", example_zh: "……这个神经网络的权重或参数。" },
+            { word: "patched", phonetic: "/pætʃt/", definition: "修补", example: "...and they are patched over time.", example_zh: "……并且会随着时间的推移不断被修补。" },
+            { word: "pre-training", phonetic: "/priː ˈtreɪnɪŋ/", definition: "预训练", example: "We call that stage pre-training.", example_zh: "我们称之为预训练。" },
+            { word: "procure", phonetic: "/prəˈkjʊr/", definition: "(努力) 获得", example: "...you procure a GPU cluster.", example_zh: "……你采购一个 GPU 集群。" },
+            { word: "reinforcement", phonetic: "/ˌriːɪnˈfɔːrsmənt/", definition: "强化", example: "...reinforcement learning from human feedback.", example_zh: "……从人类反馈中强化学习。" },
+            { word: "scaling", phonetic: "/ˈskeɪlɪŋ/", definition: "扩展；缩放", example: "...what we call scaling laws.", example_zh: "……我们所说的缩放定律。" },
+            { word: "surpass", phonetic: "/sərˈpæs/", definition: "超越", example: "It can't surpass humans.", example_zh: "它无法超越人类。" },
+            { word: "terabytes", phonetic: "/ˈterəbaɪts/", definition: "太字节 (TB)", example: "...10 terabytes of text.", example_zh: "……10TB 的文本。" },
+            { word: "Transformer", phonetic: "/trænsˈfɔːrmər/", definition: "(模型名) Transformer", example: "...the Transformer neural network architecture.", example_zh: "……Transformer 神经网络架构。" },
+            { word: "utilize", phonetic: "/ˈjuːtəlaɪz/", definition: "利用", example: "...somehow utilize all the knowledge.", example_zh: "……以某种方式利用所有知识。" },
+            // Basic Vocabulary
+            { word: "access", phonetic: "/ˈækses/", definition: "访问；接触", example: "You don't actually have access to that model.", example_zh: "你实际上无法访问该模型。" },
+            { word: "accuracy", phonetic: "/ˈækjərəsi/", definition: "准确性；精确度", example: "...the accuracy of the next word prediction task.", example_zh: "……下一个单词预测任务的准确率。" },
+            { word: "achieve", phonetic: "/əˈtʃiːv/", definition: "实现；达到", example: "...what accuracy you're going to achieve.", example_zh: "……你将达到的准确率。" },
+            { word: "adjust", phonetic: "/əˈdʒʌst/", definition: "调整", example: "...how to adjust these parameters iteratively.", example_zh: "……如何迭代地调整这些参数。" },
+            { word: "analysis", phonetic: "/əˈnæləsɪs/", definition: "分析", example: "...gives the analysis.", example_zh: "……给出分析。" },
+            { word: "application", phonetic: "/ˌæplɪˈkeɪʃn/", definition: "应用；应用程序", example: "...depending on your application, that might be good enough.", example_zh: "……根据你的应用，这可能已经足够好了。" },
+            { word: "assistant", phonetic: "/əˈsɪstənt/", definition: "助手", example: "...we obtain what we call an assistant model.", example_zh: "……我们会得到所谓的辅助模型。" },
+            { word: "available", phonetic: "/əˈveɪləbl/", definition: "可用的；可获得的", example: "These weights are available.", example_zh: "这些权重是可用的。" },
+            { word: "browse", phonetic: "/braʊz/", definition: "浏览", example: "...you would probably go off and do a search, right?", example_zh: "……你可能会去搜索，对吧？" },
+            { word: "capability", phonetic: "/ˌkeɪpəˈbɪləti/", definition: "能力；才能", example: "...this is not a capability that any of these language models have.", example_zh: "……目前这不是任何语言模型都具备的功能。" },
+            { word: "collaboration", phonetic: "/kəˌlæbəˈreɪʃn/", definition: "合作；协作", example: "...human-machine collaboration.", example_zh: "……人机协作。" },
+            { word: "compile", phonetic: "/kəmˈpaɪl/", definition: "编译", example: "...you compile your C code.", example_zh: "……你编译你的 C 代码。" },
+            { word: "complex", phonetic: "/ˈkɑːmpleks/", definition: "复杂的", example: "...performs complex decision-making.", example_zh: "……能进行复杂决策。" },
+            { word: "confidence", phonetic: "/ˈkɑːnfɪdəns/", definition: "信心", example: "...we have a lot of confidence that the next word prediction task will improve.", example_zh: "……我们很有信心下一个单词预测任务会有所改进。" },
+            { word: "connectivity", phonetic: "/kəˌnekˈtɪvəti/", definition: "连接性", example: "...you don't need any connectivity to the internet.", example_zh: "……你不需要任何互联网连接。" },
+            { word: "contain", phonetic: "/kənˈteɪn/", definition: "包含", example: "...some of the words that would contain a lot of information.", example_zh: "……包含大量信息的单词。" },
+            { word: "context", phonetic: "/ˈkɑːntekst/", definition: "上下文；语境", example: "...in this context of four words.", example_zh: "……在四个单词的上下文中。" },
+            { word: "conversation", phonetic: "/ˌkɑːnvərˈseɪʃn/", definition: "对话", example: "...all these documents now are conversations.", example_zh: "……现在所有这些文档都是对话。" },
+            { word: "create", phonetic: "/kriˈeɪt/", definition: "创建；创造", example: "...to create these labels with increasing efficiency.", example_zh: "……来创建这些标签，并且效率不断提高。" },
+            { word: "data", phonetic: "/ˈdeɪtə/", definition: "数据", example: "...a large quantity of text but potentially low quality.", example_zh: "……大量文本，但质量可能较低。" },
+            { word: "database", phonetic: "/ˈdeɪtəbeɪs/", definition: "数据库", example: "...some kind of a knowledge database.", example_zh: "……某种知识数据库。" },
+            { word: "decision", phonetic: "/dɪˈsɪʒn/", definition: "决定；决策", example: "...performs complex decision-making.", example_zh: "……能进行复杂决策。" },
+            { word: "demonstrate", phonetic: "/ˈdemənstreɪt/", definition: "展示；证明", example: "The crucial point that I want to demonstrate...", example_zh: "我想要阐明的关键点在于……" },
+            { word: "description", phonetic: "/dɪˈskrɪpʃn/", definition: "描述", example: "...it takes natural language descriptions and it generates images.", example_zh: "……它接受自然语言描述并生成图像。" },
+            { word: "develop", phonetic: "/dɪˈveləp/", definition: "开发；发展", example: "...a Go-playing program developed by DeepMind.", example_zh: "……由 DeepMind 开发的围棋程序。" },
+            { word: "document", phonetic: "/ˈdɑːkjumənt/", definition: "文档；文件", example: "...we were trying to train on internet documents.", example_zh: "……我们过去尝试使用互联网文档进行训练。" },
+            { word: "download", phonetic: "/ˌdaʊnˈloʊd/", definition: "下载", example: "...you can't really work with them, fine-tune them, download them.", example_zh: "……你无法真正地使用它们、进行微调、下载等等。" },
+            { word: "efficiency", phonetic: "/ɪˈfɪʃnsi/", definition: "效率", example: "...with increasing efficiency and correctness.", example_zh: "……并且效率和正确性都会不断提高。" },
+            { word: "engineer", phonetic: "/ˌendʒɪˈnɪr/", definition: "工程师", example: "...the engineers at a company like OpenAI...", example_zh: "……OpenAI……的工程师……" },
+            { word: "environment", phonetic: "/ɪnˈvaɪrənmənt/", definition: "环境", example: "...a simple closed sandbox environment.", example_zh: "……一个简单的封闭沙盒环境。" },
+            { word: "example", phonetic: "/ɪɡˈzæmpl/", definition: "例子；范例", example: "For example, you can send it text.", example_zh: "比如，你可以给它发送文本。" },
+            { word: "exist", phonetic: "/ɪɡˈzɪst/", definition: "存在", example: "...this number probably...almost certainly does not exist.", example_zh: "……这个数字几乎肯定不存在。" },
+            { word: "expensive", phonetic: "/ɪkˈspensɪv/", definition: "昂贵的", example: "These are very expensive computers.", example_zh: "它们非常昂贵。" },
+            { word: "expert", phonetic: "/ˈekspɜːrt/", definition: "专家", example: "...imitating human expert players.", example_zh: "……模仿人类高手。" },
+            { word: "function", phonetic: "/ˈfʌŋkʃn/", definition: "功能；函数", example: "...a very simple reward function.", example_zh: "……一个非常简单的奖励函数。" },
+            { word: "generate", phonetic: "/ˈdʒenəreɪt/", definition: "生成", example: "...this language model will start generating text.", example_zh: "……这个语言模型就会开始生成文本。" },
+            { word: "improve", phonetic: "/ɪmˈpruːv/", definition: "改进；提升", example: "...the model will improve in that situation.", example_zh: "……模型就会在这种情况下得到改进。" },
+            { word: "industry", phonetic: "/ˈɪndəstri/", definition: "行业；产业", example: "...the dynamic that you see today in the industry.", example_zh: "……当今行业中看到的动态。" },
+            { word: "information", phonetic: "/ˌɪnfərˈmeɪʃn/", definition: "信息", example: "...collect information about Scale AI.", example_zh: "……收集关于 Scale AI 的信息。" },
+            { word: "input", phonetic: "/ˈɪnpʊt/", definition: "输入", example: "We can give them some inputs.", example_zh: "我们可以给它们一些输入。" },
+            { word: "instruction", phonetic: "/ɪnˈstrʌkʃn/", definition: "指令；说明", example: "...they will give them labeling instructions.", example_zh: "……他们会给他们标注说明。" },
+            { word: "interaction", phonetic: "/ˌɪntərˈækʃn/", definition: "互动；交互", example: "We can now continue this kind of interaction.", example_zh: "我们现在可以继续这种互动了。" },
+            { word: "interface", phonetic: "/ˈɪntərfeɪs/", definition: "界面", example: "...you're allowed to use the language model through a web interface.", example_zh: "……你可以通过 Web 界面使用该语言模型。" },
+            { word: "knowledge", phonetic: "/ˈnɑːlɪdʒ/", definition: "知识", example: "...you have to learn a lot of this knowledge.", example_zh: "……你必须学习大量这方面的知识。" },
+            { word: "language", phonetic: "/ˈlæŋɡwɪdʒ/", definition: "语言", example: "...what is a large language model really?", example_zh: "……什么是大型语言模型？" },
+            { word: "library", phonetic: "/ˈlaɪbreri/", definition: "库", example: "...the Matplotlib library in Python.", example_zh: "……Python 中的 Matplotlib 库。" },
+            { word: "maintain", phonetic: "/meɪnˈteɪn/", definition: "维护；保持", example: "...they build and maintain some kind of a knowledge database.", example_zh: "……它们构建并维护着某种知识数据库。" },
+            { word: "manual", phonetic: "/ˈmænjuəl/", definition: "手工的", example: "...humans doing all of this manual work.", example_zh: "……人类在做所有的手工工作。" },
+            { word: "memory", phonetic: "/ˈmeməri/", definition: "内存；记忆", example: "...your working memory of your language model.", example_zh: "……你语言模型的工作记忆。" },
+            { word: "model", phonetic: "/ˈmɑːdl/", definition: "模型", example: "So, what is a large language model really?", example_zh: "那么，大型语言模型究竟是什么呢？" },
+            { word: "monitor", phonetic: "/ˈmɑːnɪtər/", definition: "监控", example: "...you deploy this, and you monitor and collect misbehaviors.", example_zh: "……你部署它，并监控和收集错误行为。" },
+            { word: "network", phonetic: "/ˈnetwɜːrk/", definition: "网络", example: "...the parameters of this neural network.", example_zh: "……这个神经网络的参数。" },
+            { word: "objective", phonetic: "/əbˈdʒektɪv/", definition: "目标", example: "...a very simple objective.", example_zh: "……一个非常简单的目标。" },
+            { word: "obtain", phonetic: "/əbˈteɪn/", definition: "获得", example: "...how do we obtain them.", example_zh: "……我们如何获取它们。" },
+            { word: "operation", phonetic: "/ˌɑːpəˈreɪʃn/", definition: "操作；运算", example: "...what mathematical operations happen.", example_zh: "……发生的数学运算。" },
+            { word: "optimize", phonetic: "/ˈɑːptɪmaɪz/", definition: "优化", example: "...how to optimize these parameters.", example_zh: "……如何优化这些参数。" },
+            { word: "output", phonetic: "/ˈaʊtpʊt/", definition: "输出", example: "We can measure the outputs.", example_zh: "我们可以测量它们的输出。" },
+            { word: "package", phonetic: "/ˈpækɪdʒ/", definition: "包；软件包", example: "This is a fully self-contained package.", example_zh: "这是一个完全独立的软件包。" },
+            { word: "perform", phonetic: "/pərˈfɔːrm/", definition: "执行；表现", example: "...how does it actually perform this next word prediction task?", example_zh: "……它实际上是如何执行下一个单词预测任务的？" },
+            { word: "performance", phonetic: "/pərˈfɔːrməns/", definition: "性能；表现", example: "...it can gain you additional performance.", example_zh: "……可以提升……性能。" },
+            { word: "predict", phonetic: "/prɪˈdɪkt/", definition: "预测", example: "...trying to predict the next word in a sequence.", example_zh: "……试图预测序列中的下一个单词。" },
+            { word: "process", phonetic: "/ˈprɑːses/", definition: "过程；处理", example: "...a computationally very involved process.", example_zh: "……一个非常复杂的计算过程。" },
+            { word: "product", phonetic: "/ˈprɑːdʌkt/", definition: "产品", example: "...almost like an Amazon product dream.", example_zh: "……有点像亚马逊产品的梦境。" },
+            { word: "program", phonetic: "/ˈproʊɡræm/", definition: "程序", example: "...a Go-playing program.", example_zh: "……一个围棋程序。" },
+            { word: "progress", phonetic: "/ˈprɑːɡres/", definition: "进步；进展", example: "Algorithmic progress is not necessary.", example_zh: "算法上的进步并非必需。" },
+            { word: "prompt", phonetic: "/prɑːmpt/", definition: "提示", example: "...you can attend to any prompt in order to jailbreak the model.", example_zh: "……你可以处理任何提示，以便破解模型。" },
+            { word: "provide", phonetic: "/prəˈvaɪd/", definition: "提供", example: "...we provide these people.", example_zh: "……我们提供给这些人。" },
+            { word: "quality", phonetic: "/ˈkwɑːləti/", definition: "质量", example: "...low quality.", example_zh: "……质量可能较低。" },
+            { word: "quantity", phonetic: "/ˈkwɑːntəti/", definition: "数量", example: "...a large quantity of text.", example_zh: "……大量文本。" },
+            { word: "query", phonetic: "/ˈkwɪri/", definition: "查询", example: "...the response to this query.", example_zh: "……对这个查询的响应。" },
+            { word: "release", phonetic: "/rɪˈliːs/", definition: "发布", example: "...a large language model released by Meta AI.", example_zh: "……由 Meta AI 发布的大型语言模型。" },
+            { word: "require", phonetic: "/rɪˈkwaɪər/", definition: "需要", example: "It would only require about 500 lines of C.", example_zh: "它只需要大约 500 行 C 代码。" },
+            { word: "research", phonetic: /ˈriːsɜːrtʃ/, definition: "研究", example: "...it works very similar to how you and I would do research.", example_zh: "……它的工作原理与你我进行研究的方式非常相似。" },
+            { word: "resource", phonetic: "/ˈriːsɔːrs/", definition: "资源", example: "...your finite precious resource of your working memory.", example_zh: "……你工作记忆中有限的宝贵资源。" },
+            { word: "response", phonetic: "/rɪˈspɑːns/", definition: "响应；回答", example: "...the ideal response should be...", example_zh: "……理想的回复内容应该是……" },
+            { word: "result", phonetic: "/rɪˈzʌlt/", definition: "结果", example: "...we're going to get a better result.", example_zh: "……我们会得到更好的结果。" },
+            { word: "security", phonetic: "/sɪˈkjʊrəti/", definition: "安全", example: "...we're going to have new security challenges.", example_zh: "……我们将面临新的安全挑战。" },
+            { word: "sequence", phonetic: "/ˈsiːkwəns/", definition: "序列", example: "...predict the next word in a sequence.", example_zh: "……预测序列中的下一个单词。" },
+            { word: "series", phonetic: "/ˈsɪriːz/", definition: "系列", example: "...the Llama 2 Series.", example_zh: "……Llama 2 系列。" },
+            { word: "software", phonetic: "/ˈsɔːftwer/", definition: "软件", example: "...existing software infrastructure.", example_zh: "……现有的软件基础设施。" },
+            { word: "source", phonetic: "/sɔːrs/", definition: "来源；源", example: "...Llama 2 70B is an open source model.", example_zh: "……Llama 2 70B 是一个开源模型。" },
+            { word: "specific", phonetic: "/spəˈsɪfɪk/", definition: "特定的；具体的", example: "...working with a specific example.", example_zh: "……使用一个具体的例子。" },
+            { word: "stage", phonetic: "/steɪdʒ/", definition: "阶段", example: "...the pre-training stage.", example_zh: "……预训练阶段。" },
+            { word: "standard", phonetic: "/ˈstændərd/", definition: "标准", example: "...by today's standards.", example_zh: "……按照今天的标准。" },
+            { word: "structure", phonetic: "/ˈstrʌktʃər/", definition: "结构", example: "...the neural network architecture.", example_zh: "……神经网络架构。" },
+            { word: "system", phonetic: "/ˈsɪstəm/", definition: "系统", example: "...system one versus system two type of thinking.", example_zh: "……系统一与系统二的思维模式。" },
+            { word: "task", phonetic: "/tæsk/", definition: "任务", example: "...a very difficult task.", example_zh: "……一项非常艰巨的任务。" },
+            { word: "tool", phonetic: "/tuːl/", definition: "工具", example: "...it is now about using tools.", example_zh: "……现在需要使用工具。" },
+            { word: "traditional", phonetic: "/trəˈdɪʃənl/", definition: "传统的", example: "...that happen in traditional security.", example_zh: "……在传统安全领域中发生。" },
+            { word: "train", phonetic: "/treɪn/", definition: "训练", example: "...how it was trained.", example_zh: "……它是如何训练的。" },
+            { word: "weight", phonetic: "/weɪt/", definition: "权重", example: "...the weights or the parameters of this neural network.", example_zh: "……这个神经网络的权重或参数。" },
+        ];
+
+        // --- DOM Elements ---
+        const wordList = document.getElementById('word-list');
+        const flashcard = document.getElementById('flashcard');
+        const cardWord = document.getElementById('card-word');
+        const cardPhonetic = document.getElementById('card-phonetic');
+        const cardDefinition = document.getElementById('card-definition');
+        const cardExample = document.getElementById('card-example');
+        const cardExampleZh = document.getElementById('card-example-zh');
+        const cardCounter = document.getElementById('card-counter');
+        const prevButton = document.getElementById('prev-button');
+        const nextButton = document.getElementById('next-button');
+        const speakButton = document.getElementById('speak-button');
+
+        // --- State ---
+        let currentIndex = 0;
+        let isFlipped = false;
+        const synth = window.speechSynthesis;
+
+        // --- Functions ---
+
+        /**
+         * Populates the directory with clickable word items.
+         */
+        function populateDirectory() {
+            vocabulary.forEach((item, index) => {
+                const li = document.createElement('li');
+                const button = document.createElement('button');
+                button.textContent = item.word;
+                button.classList.add('word-item');
+                button.dataset.index = index;
+                button.addEventListener('click', () => {
+                    currentIndex = index;
+                    updateCard();
+                });
+                li.appendChild(button);
+                wordList.appendChild(li);
+            });
+        }
+        
+        /**
+         * Updates the active state in the word directory.
+         */
+        function updateDirectoryActiveState() {
+            const wordItems = document.querySelectorAll('.word-item');
+            wordItems.forEach((item, index) => {
+                if (index === currentIndex) {
+                    item.classList.add('active');
+                    // Scroll the active item into view
+                    item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+        }
+
+        /**
+         * Updates the card content based on the current index.
+         */
+        function updateCard() {
+            const currentWord = vocabulary[currentIndex];
+            cardWord.textContent = currentWord.word;
+            cardPhonetic.textContent = currentWord.phonetic;
+            cardDefinition.textContent = currentWord.definition;
+            cardExample.textContent = currentWord.example;
+            cardExampleZh.textContent = currentWord.example_zh;
+            cardCounter.textContent = `${currentIndex + 1} / ${vocabulary.length}`;
+            
+            if (isFlipped) {
+                flashcard.classList.remove('is-flipped');
+                isFlipped = false;
+            }
+            
+            prevButton.disabled = currentIndex === 0;
+            nextButton.disabled = currentIndex === vocabulary.length - 1;
+            
+            updateDirectoryActiveState();
+        }
+
+        /**
+         * Flips the card.
+         */
+        function flipCard() {
+            isFlipped = !isFlipped;
+            flashcard.classList.toggle('is-flipped');
+        }
+
+        /**
+         * Navigates to the next card.
+         */
+        function nextCard() {
+            if (currentIndex < vocabulary.length - 1) {
+                currentIndex++;
+                updateCard();
+            }
+        }
+
+        /**
+         * Navigates to the previous card.
+         */
+        function prevCard() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                updateCard();
+            }
+        }
+        
+        /**
+         * Pronounces the current word using the Web Speech API.
+         */
+        function speakWord(e) {
+            e.stopPropagation();
+            if (synth.speaking) {
+                return;
+            }
+            const wordToSpeak = vocabulary[currentIndex].word;
+            const utterThis = new SpeechSynthesisUtterance(wordToSpeak);
+            utterThis.lang = 'en-US';
+            synth.speak(utterThis);
+        }
+
+        // --- Event Listeners ---
+        flashcard.addEventListener('click', flipCard);
+        nextButton.addEventListener('click', nextCard);
+        prevButton.addEventListener('click', prevCard);
+        speakButton.addEventListener('click', speakWord);
+        
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight') nextCard();
+            else if (e.key === 'ArrowLeft') prevCard();
+            else if (e.key === ' ') {
+                e.preventDefault();
+                flipCard();
+            }
+        });
+
+        // --- Initial Load ---
+        populateDirectory();
+        updateCard();
+
+    </script>
+</body>
+</html>
